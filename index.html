@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>簡易報帳管理系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- 引入 LINE LIFF SDK -->
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto+Sans+TC', sans-serif;
+            background-color: #f1f5f9;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 1);
+        }
+        .modal-overlay {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+        }
+        /* 載入中動畫 */
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid #fff;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <nav class="bg-indigo-700 text-white shadow-lg p-4">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <i data-lucide="receipt"></i>
+                <h1 class="text-xl font-bold tracking-tight">簡易報帳提交系統</h1>
+            </div>
+            <div class="text-xs opacity-80 bg-indigo-600 px-3 py-1 rounded-full border border-indigo-400">
+                福音研究所專用
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow flex items-center justify-center p-4">
+        <div id="loading-liff" class="text-slate-500 flex flex-col items-center gap-2">
+            <div class="spinner !border-indigo-600 !border-top-indigo-100"></div>
+            <p>正在透過 LINE 認證身分...</p>
+        </div>
+
+        <div id="form-container" class="glass-panel p-8 rounded-3xl shadow-xl w-full max-w-2xl transition-all hover:shadow-2xl hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                <i data-lucide="file-text" class="text-indigo-600"></i> 填寫報帳表單
+            </h2>
+            
+            <form id="expense-form" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 報帳者 (由 LIFF 自動填入) -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-bold text-gray-700">報帳者 (LINE 姓名)</label>
+                        <input type="text" id="reporter" required readonly class="block w-full rounded-xl border-gray-200 bg-gray-50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border cursor-not-allowed" title="由系統自動取得">
+                    </div>
+
+                    <!-- 活動項目 -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-bold text-gray-700">活動項目</label>
+                        <select id="activityItem" required class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border">
+                            <option value="周活動Weekly Event(福研)">周活動 Weekly Event (福研)</option>
+                            <option value="例行會議Council(單成會議)">例行會議 Council (單成會議)</option>
+                            <option value="特別專案Special Event(唱詩班、交通、單成大會)">特別專案 Special Event (唱詩班、交通、單成大會)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 使用單位 -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-bold text-gray-700">使用單位</label>
+                        <select id="unit" required class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border">
+                            <option value="桃園支聯會單成中心(TY YSA)">桃園支聯會單成中心 (TY YSA)</option>
+                            <option value="新竹支聯會單成中心(HC YSA)">新竹支聯會單成中心 (HC YSA)</option>
+                            <option value="龍潭福研(LT Ward)">龍潭福研 (LT Ward)</option>
+                            <option value="桃園 x 新竹支聯會(TY x HC YSA)">桃園 x 新竹支聯會 (TY x HC YSA)</option>
+                            <option value="單成大會(YSA Conference)">單成大會 (YSA Conference)</option>
+                        </select>
+                    </div>
+                    <!-- 開支類型 -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-bold text-gray-700">開支類型</label>
+                        <select id="expenseType" required class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border">
+                            <option value="伙食(Food)">伙食 (Food)</option>
+                            <option value="活動(Activity)">活動 (Activity)</option>
+                            <option value="文宣(Publicity)">文宣 (Publicity)</option>
+                            <option value="器材(Equipment)">器材 (Equip.)</option>
+                            <option value="交通(Transportation)">交通 (Transport)</option>
+                            <option value="住宿(Accommodation)">住宿 (Accomm.)</option>
+                            <option value="會議(Meeting)">會議 (Meeting)</option>
+                            <option value="其他(Others)">其他 (Others)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- 日期 -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-bold text-gray-700">日期</label>
+                        <input type="date" id="date" required class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border">
+                    </div>
+                    <!-- 主活動 -->
+                    <div class="space-y-1.5 md:col-span-1">
+                        <label class="block text-sm font-bold text-gray-700">主活動</label>
+                        <input type="text" id="mainActivity" value="福音研究所" required class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border">
+                    </div>
+                    <!-- 社交活動 -->
+                    <div class="space-y-1.5 md:col-span-1">
+                        <label class="block text-sm font-bold text-gray-700">社交活動</label>
+                        <input type="text" id="socialActivity" placeholder="排球活動、課程..." class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 金額 -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-bold text-gray-700">金額</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-3.5 text-gray-400 font-bold">$</span>
+                            <input type="number" id="amount" required min="0" step="1" placeholder="請輸入整數金額" class="pl-8 block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border">
+                        </div>
+                    </div>
+                    <!-- 實到人數 -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-bold text-gray-700">實到人數</label>
+                        <input type="number" id="attendance" required min="1" step="1" placeholder="請輸入參與人數" class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border">
+                    </div>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 發票類型 -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-bold text-gray-700">發票類型</label>
+                        <select id="invoiceType" required class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border">
+                            <option value="統一發票">統一發票</option>
+                            <option value="收據">收據</option>
+                            <option value="其他(替代文件)">其他</option>
+                        </select>
+                    </div>
+                    <!-- 發票號碼 -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-bold text-gray-700">發票號碼</label>
+                        <input type="text" id="invoiceNumber" placeholder="編號/末碼" class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border">
+                    </div>
+                </div>
+
+                <!-- 備註 -->
+                <div class="space-y-1.5">
+                    <label class="block text-sm font-bold text-gray-700">備註</label>
+                    <textarea id="remarks" rows="2" placeholder="其他需要說明的事項..." class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border"></textarea>
+                </div>
+
+                <button type="submit" class="w-full bg-indigo-600 text-white py-4 px-4 rounded-2xl font-bold hover:bg-indigo-700 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2 text-lg">
+                    <i data-lucide="send" size="22"></i> 送出提交
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="relative glass-panel rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+            <div class="bg-indigo-600 p-6 text-white text-center">
+                <i data-lucide="clipboard-check" class="mx-auto mb-3" size="48"></i>
+                <h3 class="text-xl font-bold">確認報帳資訊</h3>
+            </div>
+            <div class="p-6 max-h-[60vh] overflow-y-auto space-y-4 text-sm text-gray-600">
+                <div id="modal-summary" class="divide-y divide-gray-100">
+                    <!-- Summary items will be injected here -->
+                </div>
+            </div>
+            <div class="p-6 bg-gray-50 flex gap-4">
+                <button id="cancel-modal" class="flex-1 px-4 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition">
+                    回頭修改
+                </button>
+                <button id="confirm-submit" class="flex-1 px-4 py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 shadow-md transition flex items-center justify-center gap-2">
+                    <span id="btn-text">確定提交</span>
+                    <div id="btn-spinner" class="spinner hidden"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Final Success Message -->
+    <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50">
+        <i data-lucide="party-popper" class="text-emerald-400"></i>
+        <div>
+            <p class="font-bold">送出成功！</p>
+            <p class="text-xs text-gray-400">資料已同步至 Google Sheet。</p>
+        </div>
+    </div>
+
+    <script>
+        // --- 設定區 ---
+        const LIFF_ID = 'YOUR_LIFF_ID'; // 請替換為您的 LIFF ID
+        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyq8DNCPI_CiV_0B8lAjlpELqtNEtLk_vmb5EQsyJi_Gch-5aJvz7E7ZJcKYhEZnaE8yQ/exec'; 
+        // --------------
+
+        const form = document.getElementById('expense-form');
+        const activitySelect = document.getElementById('activityItem');
+        const mainActivityInput = document.getElementById('mainActivity');
+        const confirmModal = document.getElementById('confirm-modal');
+        const modalSummary = document.getElementById('modal-summary');
+        const cancelBtn = document.getElementById('cancel-modal');
+        const confirmBtn = document.getElementById('confirm-submit');
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
+        
+        let pendingData = null;
+
+        // 初始化 LIFF
+        async function initLiff() {
+            try {
+                await liff.init({ liffId: LIFF_ID });
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                } else {
+                    const profile = await liff.getProfile();
+                    document.getElementById('reporter').value = profile.displayName;
+                    document.getElementById('loading-liff').classList.add('hidden');
+                    document.getElementById('form-container').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('LIFF Error:', error);
+                // 離線開發測試用 (如果非 LIFF 環境則手動開啟)
+                document.getElementById('reporter').value = "測試人員";
+                document.getElementById('reporter').readOnly = false;
+                document.getElementById('loading-liff').classList.add('hidden');
+                document.getElementById('form-container').classList.remove('hidden');
+            }
+        }
+
+        // Logic: Clear main activity on certain types
+        activitySelect.addEventListener('change', () => {
+            const val = activitySelect.value;
+            if (val.includes('例行會議') || val.includes('特別專案')) {
+                mainActivityInput.value = '';
+                mainActivityInput.placeholder = "請輸入活動名稱 (必填)...";
+            } else {
+                mainActivityInput.value = "福音研究所";
+            }
+        });
+
+        // Handle Form Submission
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            pendingData = {
+                'timestamp': new Date().toLocaleString(),
+                '報帳者': document.getElementById('reporter').value,
+                '活動項目': document.getElementById('activityItem').value,
+                '使用單位': document.getElementById('unit').value,
+                '開支類型': document.getElementById('expenseType').value,
+                '日期': document.getElementById('date').value,
+                '主活動': document.getElementById('mainActivity').value,
+                '社交活動': document.getElementById('socialActivity').value || '無',
+                '金額': Math.floor(Number(document.getElementById('amount').value)),
+                '實到人數': Math.floor(Number(document.getElementById('attendance').value)),
+                '發票類型': document.getElementById('invoiceType').value,
+                '發票號碼': document.getElementById('invoiceNumber').value || '無',
+                '備註': document.getElementById('remarks').value || '無'
+            };
+
+            // Inject Summary into Modal
+            modalSummary.innerHTML = Object.entries(pendingData).map(([key, value]) => `
+                <div class="py-2 flex justify-between gap-4">
+                    <span class="font-bold text-gray-800 shrink-0">${key === 'timestamp' ? '送出時間' : key}</span>
+                    <span class="text-gray-600 text-right break-words">${key === '金額' ? '$' + value.toLocaleString() : value}</span>
+                </div>
+            `).join('');
+
+            confirmModal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            lucide.createIcons();
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        });
+
+        // 確定提交：發送到 Google Sheets
+        confirmBtn.addEventListener('click', async () => {
+            if (!pendingData) return;
+
+            // UI 狀態
+            confirmBtn.disabled = true;
+            btnText.textContent = "傳送中...";
+            btnSpinner.classList.remove('hidden');
+
+            try {
+                // 使用 fetch 發送 POST 請求到 GAS
+                await fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(pendingData)
+                });
+
+                showToast('報帳資料已送出提交');
+                
+                // 重設表單
+                form.reset();
+                document.getElementById('date').valueAsDate = new Date();
+                document.getElementById('mainActivity').value = "福音研究所";
+                
+                try {
+                    const profile = await liff.getProfile();
+                    document.getElementById('reporter').value = profile.displayName;
+                } catch(e) {
+                    document.getElementById('reporter').value = "測試人員";
+                }
+
+            } catch (error) {
+                console.error('Submit Error:', error);
+                alert('提交失敗，請檢查網路連線或聯繫管理員。');
+            } finally {
+                confirmModal.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+                confirmBtn.disabled = false;
+                btnText.textContent = "確定提交";
+                btnSpinner.classList.add('hidden');
+            }
+        });
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.className = `fixed bottom-6 right-6 transform transition-all duration-300 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50 opacity-100 translate-y-0`;
+            setTimeout(() => toast.classList.add('opacity-0', 'translate-y-20'), 4000);
+        }
+
+        window.onload = () => {
+            document.getElementById('date').valueAsDate = new Date();
+            initLiff();
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>
