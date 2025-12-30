@@ -246,7 +246,7 @@
             } catch (error) {
                 console.error('LIFF Error:', error);
                 // 離線開發測試用 (如果非 LIFF 環境則手動開啟)
-                document.getElementById('reporter').value = "測試人員";
+                document.getElementById('reporter').value = "";
                 document.getElementById('reporter').readOnly = false;
                 document.getElementById('loading-liff').classList.add('hidden');
                 document.getElementById('form-container').classList.remove('hidden');
